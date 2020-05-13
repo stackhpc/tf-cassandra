@@ -45,20 +45,6 @@ resource "openstack_networking_subnet_v2" "net" {
   ip_version      = 4
 }
 
-resource "openstack_compute_instance_v2" "control" {
-  name = "${local.config.instance_prefix}-control-0"
-  image_name = local.config.compute_image
-  flavor_name = local.config.compute_flavor
-  key_pair = openstack_compute_keypair_v2.terraform.name
-  network {
-    uuid = openstack_networking_network_v2.net.id
-  }
-  metadata = {
-    "terraform directory" = local.tf_dir
-  }
-  depends_on = [openstack_networking_subnet_v2.net]
-}
-
 resource "openstack_compute_instance_v2" "compute" {
   count = local.config.num_compute
 
@@ -80,7 +66,7 @@ resource "openstack_networking_floatingip_v2" "fip" {
 }
 resource "openstack_compute_floatingip_associate_v2" "fip" {
   floating_ip = openstack_networking_floatingip_v2.fip.address
-  instance_id = openstack_compute_instance_v2.control.id
+  instance_id = openstack_compute_instance_v2.compute[0].id
 }
 
 resource "openstack_networking_router_v2" "external" {
@@ -99,20 +85,25 @@ data "template_file" "inventory" {
   vars = {
       ssh_user_name = local.config.ssh_user_name
       fip = openstack_networking_floatingip_v2.fip.address
-      control = <<EOT
-${openstack_compute_instance_v2.control.name} ansible_host=${openstack_compute_instance_v2.control.network[0].fixed_ip_v4}
-EOT
       computes = <<EOT
-%{ for compute in openstack_compute_instance_v2.compute}${compute.name} ansible_host=${compute.network[0].fixed_ip_v4}
-%{ endfor }
+%{ for compute in openstack_compute_instance_v2.compute ~}
+${compute.name} ansible_host=${compute.network[0].fixed_ip_v4}
+%{ endfor ~}
 EOT
-      instance_prefix = local.config.instance_prefix
-      partition_name = local.config.partition_name
+seeds = <<EOT
+%{ for seed in slice(openstack_compute_instance_v2.compute, 0, 2) ~}
+${seed.name}
+%{ endfor ~}
+EOT
   }
-  depends_on = [openstack_compute_instance_v2.control, openstack_compute_instance_v2.compute]
+  depends_on = [openstack_compute_instance_v2.compute]
 }
 
 resource "local_file" "hosts" {
   content  = data.template_file.inventory.rendered
   filename = "${path.cwd}/inventory"
+}
+
+output "instance_ip_addr" {
+  value = openstack_compute_floatingip_associate_v2.fip.floating_ip
 }
