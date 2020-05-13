@@ -38,11 +38,16 @@ pip install -U pip
 pip install -U -r requirements.txt # ansible, openstack sdk and selinux shim
 ```
 
-Install the requirements for the Cassandra role into a local directory:
+Clone the cassandra role and install its requirements into a local directory:
 ```shell
 mkdir roles
-ansible-galaxy install --roles-path roles/ -r molecule/default/requirements.yml
+git clone git@github.com:wireapp/ansible-cassandra.git roles/ansible-cassandra
+ansible-galaxy install --roles-path roles/ -r roles/ansible-cassandra/molecule/default/requirements.yml
 ```
+
+Modify the cassandra role to fix a missing package:
+- Edit `roles/ansible-cassandra/defaults/RedHat.yml`
+- Change `jemalloc` to `memkind.x86_64`
 
 Install terraform:
 ```shell
