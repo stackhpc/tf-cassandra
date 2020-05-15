@@ -104,6 +104,6 @@ resource "local_file" "hosts" {
   filename = "${path.cwd}/inventory"
 }
 
-output "instance_ip_addr" {
+output "proxy_ip_addr" {
   value = openstack_compute_floatingip_associate_v2.fip.floating_ip
 }
