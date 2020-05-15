@@ -92,3 +92,11 @@ To destroy the cluster when done:
 ```shell
 terraform destroy
 ```
+
+# Usage
+
+The role configures Cassadnra's `cqlsh` CLI tool to connect to the clsuter automatically. So you can log in to a node (as described above) then just run:
+
+    cqlsh
+
+See https://cassandra.apache.org/doc/latest/tools/cqlsh.html for reference.
