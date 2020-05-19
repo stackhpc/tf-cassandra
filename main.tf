@@ -15,10 +15,6 @@ provider "template" {
   version = "~> 2.1"
 }
 
-data "openstack_networking_network_v2" "internet" {
-  name = local.config.floatingip_pool
-}
-
 data "external" "tf_control_hostname" {
   program = ["./gethost.sh"] 
 }
@@ -33,18 +29,6 @@ resource "openstack_compute_keypair_v2" "terraform" {
   public_key = file("${local.config.ssh_key_file}") # should be .pub one
 }
 
-resource "openstack_networking_network_v2" "net" {
-  name = "${local.config.instance_prefix}-net"
-  admin_state_up = "true"
-}
-resource "openstack_networking_subnet_v2" "net" {
-  name = "${local.config.instance_prefix}-subnet"
-  network_id      = openstack_networking_network_v2.net.id
-  cidr            = local.config.address_space
-  dns_nameservers = ["8.8.8.8", "8.8.4.4"]
-  ip_version      = 4
-}
-
 resource "openstack_compute_instance_v2" "compute" {
   count = local.config.num_compute
 
@@ -53,38 +37,18 @@ resource "openstack_compute_instance_v2" "compute" {
   flavor_name = local.config.compute_flavor
   key_pair = openstack_compute_keypair_v2.terraform.name
   network {
-    uuid = openstack_networking_network_v2.net.id
+    name = local.config.network
   }
   metadata = {
     "terraform directory" = local.tf_dir
   }
-  depends_on = [openstack_networking_subnet_v2.net]
-}
-
-resource "openstack_networking_floatingip_v2" "fip" {
-  pool = local.config.floatingip_pool
-}
-resource "openstack_compute_floatingip_associate_v2" "fip" {
-  floating_ip = openstack_networking_floatingip_v2.fip.address
-  instance_id = openstack_compute_instance_v2.compute[0].id
-}
-
-resource "openstack_networking_router_v2" "external" {
-  name                = "external"
-  admin_state_up      = "true"
-  external_network_id = data.openstack_networking_network_v2.internet.id
-}
-
-resource "openstack_networking_router_interface_v2" "net" {
-  router_id = openstack_networking_router_v2.external.id
-  subnet_id = openstack_networking_subnet_v2.net.id
 }
 
 data "template_file" "inventory" {
   template = "${file("${path.module}/inventory.tpl")}"
   vars = {
       ssh_user_name = local.config.ssh_user_name
-      fip = openstack_networking_floatingip_v2.fip.address
+      proxy_ip = openstack_compute_instance_v2.compute[0].network[0].fixed_ip_v4
       computes = <<EOT
 %{ for compute in openstack_compute_instance_v2.compute ~}
 ${compute.name} ansible_host=${compute.network[0].fixed_ip_v4}
@@ -105,5 +69,5 @@ resource "local_file" "hosts" {
 }
 
 output "proxy_ip_addr" {
-  value = openstack_compute_floatingip_associate_v2.fip.floating_ip
+  value = openstack_compute_instance_v2.compute[0].network[0].fixed_ip_v4
 }

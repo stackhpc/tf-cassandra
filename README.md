@@ -2,46 +2,29 @@ Example of using [Terraform](https://www.terraform.io/) with Ansible-deployed Ca
 
 **NB: This is for teaching purposes only and is NOT intended as a production deployment.**
 
-# Setup Deployment Environment
+# Deployment Host Setup
 
-Your deployment environment should have the following commands available:
-- `git`
-- `python`
-- `pip`
-- `virtualenv`
-- `wget`
-- `unzip`
+The host we're using for the workshop already has several things set up:
+- `git`, `python`, `pip`, `virtualenv`, `wget` and `unzip` installed.
+- A virtualenv at `~/venv` which has `openstacksdk` and `ansible` installed.
+- `terraform` installed.
+- An openstack rc file and a `~/.config/openstack/clouds.yaml` file to authenticate against openstack.
+- Ansible galaxy roles downloaded to `~/.ansible/roles`
+- An ssh keypair at `~/.ssh/id_rsa{.pub}`.
 
-If on centos7 with sudo rights you can run:
+To avoid treading on other's work, create your own directory and work in that:
 
-```shell
-sudo yum install -y epel-release
-sudo yum install -y git
-sudo yum install -y python-pip
-sudo pip install -U pip # updates pip
-sudo pip install virtualenv
-sudo yum install -y wget
-sudo yum install -y unzip
-```
-
-Now clone this repo:
-```shell
-git clone git@github.com:stackhpc/tf-cassandra.git
-```
-
-Make and activate a virtualenv, then install ansible, the openstack sdk and an selinux shim via `pip`:
-```shell
-cd tf-cassandra
-virtualenv .venv
-. .venv/bin/activate
-pip install -U pip
-pip install -U -r requirements.txt # ansible, openstack sdk and selinux shim
-```
+    cd
+    . ~/venv/bin/activate   # makes openstack and ansible available
+    mkdir <yourname>
+    cd <yourname>
+    git clone https://github.com/stackhpc/tf-cassandra.git   # this repo
+    cd tf-cassandra
 
 Clone the cassandra role and install its requirements into a local directory:
 ```shell
 mkdir roles
-git clone git@github.com:wireapp/ansible-cassandra.git roles/ansible-cassandra
+git clone https://github.com/wireapp/ansible-cassandra.git roles/ansible-cassandra
 ansible-galaxy install --roles-path roles/ -r roles/ansible-cassandra/molecule/default/requirements.yml
 ```
 
@@ -61,32 +44,26 @@ Create a [`clouds.yaml`](https://docs.openstack.org/openstacksdk/latest/user/con
 
 # Deployment and Configuration
 
-If you want to use a new ssh keypair to connect to the nodes, create it now.
+1. In `group_vars/all.yml`, change `instance_prefix` to your name.
 
-Modify `group_vars/all.yml` appropriately then deploy infrastructure using Terraform:
+2. Deploy infrastructure using Terraform:
 
-```shell
-cd tf-cassandra
-terraform init
-terraform plan
-terraform apply
-```
+        terraform init
+        terraform plan
+        terraform apply
 
-Then install and configure nodes using Ansible:
-```shell
-. .venv/bin/activate
-ansible-playbook -i inventory install.yml
-```
+   This will generate a file `./inventory`.
 
-This will generate a file `inventory`.
+3. Install and configure software using Ansible:
+    
+        . ~/venv/bin/activate
+        ansible-playbook -i inventory install.yml
 
-To log in to the cluster:
-```shell
-ssh <ansible_ssh_common_args> centos@<node_ip>
-```
-where:
-- `ansible_ssh_common_args` is given in the `inventory`
-- `node_ip` is from the `ansible_host` parameter for relevant node in the `inventory`
+4. To log in to the cluster use:
+
+        ssh centos@<ssh_proxy>
+
+   where `ssh_proxy` is given in the inventory.
 
 To destroy the cluster when done:
 ```shell
